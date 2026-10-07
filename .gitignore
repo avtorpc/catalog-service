@@ -1,0 +1,56 @@
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+#/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+#/vendor/
+###< symfony/framework-bundle ###
+
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Логи
+*.log
+var/log/
+var/cache/
+
+###> phpunit/phpunit ###
+/phpunit.xml
+**/phpunit-report.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+# MESTO: local/runtime files must not enter the new history
+.DS_Store
+.idea/
+.vscode/
+*.log
+*.tmp
+*.cache
+*.pem
+*.key
+*.p12
+*.jks
+/.env
+/.env.dev
+/.env.test
+/.env.local
+/.env.local.php
+/.env.*.local
+vendor/
+var/
+node_modules/
+/vendor/
+/var/
+/public/bundles/
+/config/secrets/*/*.decrypt.private.php
+/.phpunit.cache/
+/.phpunit.result.cache

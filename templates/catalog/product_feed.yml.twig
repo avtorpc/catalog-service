@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<yml_catalog date="{{ date_time_feed }}">
+    <shop>
+        <name>{{ vendor_name|e }}</name>
+        <url>{{ site_url|e }}</url>
+        <currencies>
+            {% for currency in currencies %}
+            <currency id="{{ currency|e('html_attr') }}" rate="1"/>
+            {% endfor %}
+        </currencies>
+        <categories>
+            {% for category in categories %}
+            <category id="{{ category.external_id|e('html_attr') }}"{% if category.parent_external_id is not empty %} parentId="{{ category.parent_external_id|e('html_attr') }}"{% endif %} url="{{ (site_url ~ '/' ~ section_link_prefix ~ '/' ~ category.slug)|e }}">{{ category.name|e }}</category>
+            {% endfor %}
+        </categories>
+        <offers>
+            {% for offer in offers %}
+            <offer available="{{ offer.quantity is not null and offer.quantity > 0 ? 'true' : 'false' }}" id="{{ offer.id|e('html_attr') }}">
+                <url>{{ site_url|e }}/{{ product_link_prefix|e }}/{{ offer.slug|e }}</url>
+                {% if offer.price is not null %}
+                <price>{{ offer.price }}</price>
+                <price_min>{{ offer.price }}</price_min>
+                {% endif %}
+                <vendor>{{ vendor_name|e }}</vendor>
+                <vendorCode>{{ offer.external_code|e }}</vendorCode>
+                <code>{{ offer.external_code|e }}</code>
+                <currencyId>{{ offer.currency|e }}</currencyId>
+                {% if offer.category_id is not empty %}
+                <categoryId>{{ offer.category_id|e }}</categoryId>
+                {% endif %}
+                {% if offer.image_url is not empty %}
+                <picture>{{ offer.image_url|e }}</picture>
+                {% endif %}
+                <name>{{ offer.name|e }}</name>
+                <presence>{{ offer.quantity is not null and offer.quantity > 0 ? 'в наличии' : 'под заказ' }}</presence>
+                {% if offer.unit is not empty %}
+                <param name="Единица измерения">{{ offer.unit|e }}</param>
+                {% endif %}
+                {% if offer.quantity is not null %}
+                <param name="Количество">{{ offer.quantity }}</param>
+                {% endif %}
+            </offer>
+            {% endfor %}
+        </offers>
+    </shop>
+</yml_catalog>
