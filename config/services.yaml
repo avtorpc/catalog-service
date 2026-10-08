@@ -1,160 +1,40 @@
-# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
-
-# This file is the entry point to configure your own services.
-# Files in the packages/ subdirectory configure your dependencies.
-# See also https://symfony.com/doc/current/service_container/import.html
-
-# Put parameters here that don't need to change on each machine where the app is deployed
-# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
-    kafka_gateway_url: '%env(KAFKA_GATEWAY_URL)%'           # Сервис куда шлем сообщеня
-    kafka_mail_send_path_api: 'kafka/mail-send'             # Путь по которому шлем
-
-    dictionary_service_url: '%env(DICTIONARY_SERVICE_URL)%'# URL по которому работает API словарей
-
-    app.timezone: '%env(APP_TIMEZONE)%'                     # Тайм зона для микросервиса
-    db_schema: '%env(DB_SCHEMA)%'                           # Схема Postgresql с которой работает микросервис
-
-    app.name: '%env(APP_NAME)%'                             # Имя микросервиса
-    app.version: '%env(APP_VERSION)%'                       # Версия сборки
-
-    app.access_token_ttl: '%env(AUTH_ACCESS_TOKEN_TTL)%'    # время жизни токена access
-    app.refresh_token_ttl: '%env(AUTH_REFRESH_TOKEN_TTL)%'  # Версия сборки
-
-    catalog.import.batch_size: '%env(int:CATALOG_IMPORT_BATCH_SIZE)%'
-
-    catalog.import.upload_dir: '%env(CATALOG_UPLOAD_DIR)%'
-    catalog.section.link_prefix: 'catalog/section'
-    catalog.product.link_prefix: 'catalog/product'
-    catalog.feed.vendor_name: 'ONMI'
-    catalog.feed.site_url: 'https://dev.onmi.pro'
-
-    product_import.match_threshold: 50
-
+    db_schema: '%env(DB_SCHEMA)%'
+    app.name: '%env(APP_NAME)%'
+    app.version: '%env(APP_VERSION)%'
+    app.timezone: '%env(APP_TIMEZONE)%'
     jwt.issuer: '%env(JWT_CATALOG_ISSUER)%'
     jwt.audience: '%env(JWT_AUDIENCE_ACCESS_TOKEN)%'
     jwt.public_key: '%env(file:JWT_PUBLIC_KEY_FILE)%'
 
 services:
-    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies in your services.
-        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
-
-    # makes classes in src/ available to be used as services
-    # this creates a service per class whose id is the fully-qualified class name
-    App\:
-        resource: '../src/'
-        exclude:
-            - '../src/DependencyInjection/'
-            - '../src/Entity/'
-            - '../src/Kernel.php'
-
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
-
-    # Регистрируем обработчик ошибок
-    App\EventSubscriber\:
-        resource: '../src/EventSubscriber'
-        tags: [ 'kernel.event_subscriber' ]
-
-    # ------------------- UserToken -------------------
-    # Infrastructure: DB, Redis, Code generator
-    App\Infrastructure\Registration\SignupRequestStorage:
-        arguments:
-            $connection: '@doctrine.dbal.default_connection'
-
-    App\Infrastructure\Registration\SignupRedisStorage:
-        arguments:
-            $redis: '@redis'  # подключение Redis
-
-    App\Shared\Utils\VerificationCodeGenerator: ~
-
-    App\Domain\Dictionaries\DictionaryDomainService:
-        arguments:
-            $dictionaryProvider: '@App\Infrastructure\Dictionary\HttpDictionaryProvider'
-
-    redis:
-        class: Predis\Client
-        factory: ['App\Infrastructure\Registration\RedisFactory', 'create']
-        arguments:
-            - '%env(REDIS_URL)%'
-            - '%env(default::REDIS_PASSWORD)%'
-            - '%env(default::REDIS_SSL_CA)%'
-
-    # ------------------- Verification -------------------
-
-    App\Infrastructure\Registration\VerificationCodeStorage:
-        arguments:
-            $connection: '@doctrine.dbal.default_connection'
-
-    App\Infrastructure\Registration\VerificationCodeRedisStorage:
-        arguments:
-            $redis: '@redis'
-
-    App\Domain\Registration\Otp\OtpStorageInterface:
-        alias: App\Infrastructure\Registration\Otp\Redis\RedisOtpStorage
-
-    # Application: VerificationCodeService с одним сторажем
-    App\Application\Registration\Verification\VerificationCodeService:
         autowire: true
         autoconfigure: true
-
-    App\Infrastructure\Registration\Otp\Redis\RedisOtpStorage:
-        arguments:
-            $redis: '@redis'  # подключение Redis
-
-    App\Infrastructure\RateLimit\EmailRateLimiter:
-        arguments:
-            $redis: '@redis'
-            $serviceName: '%app.name%'
-
-    App\Infrastructure\EventPublisher\HttpEmailEventPublisher:
-        arguments:
-            $baseUrl: '%kafka_gateway_url%'
-            $mailSendPath: '%kafka_mail_send_path_api%'
-
-
-    App\Infrastructure\Dictionary\HttpDictionaryProvider:
-        arguments:
-            $baseUrl: '%dictionary_service_url%'
-
-    # ------------------- Service name & Version    ------------
-    App\Infrastructure\Application\ApplicationInfo:
-        arguments:
-            $name: '%app.name%'
-            $version: '%app.version%'
-
-    # ------------------- Time checker class    ----------------
-    App\Shared\Time\ClockInterface:
-        alias: App\Shared\Time\SystemClock
-
-    App\Shared\Time\SystemClock:
-        arguments:
-            $timezone: '%app.timezone%'
-
-    # ------------------- DB schema class      ----------------
-    App\Infrastructure\DB\SchemaSqlHelper:
-        arguments:
-            $schema: '%db_schema%'
-
-    # ------------------- Save File           ----------------
-    App\Application\Import\UploadFile\Service\LocalImportFileStorage:
-        arguments:
-            $uploadDir: '%catalog.import.upload_dir%'
-
-
-    App\Infrastructure\Catalog\Slug\SlugGenerator:
-        autowire: true
-        autoconfigure: true
-
-    # ------------------- Import Products ---------------
-    App\Controller\Api\UploadFile\UploadProductsController:
-        arguments:
-            $matchThreshold: '%product_import.match_threshold%'
-
+    App\Application\Workspace\:
+        resource: '../src/Application/Workspace/'
+    App\Infrastructure\Workspace\:
+        resource: '../src/Infrastructure/Workspace/'
+    App\Controller\WorkspaceController: ~
+    App\Controller\AssessmentController: ~
+    App\Command\AssessmentWorkCommand: ~
+    App\Controller\ApiController: ~
+    App\EventSubscriber\ApiExceptionSubscriber: ~
+    App\Infrastructure\Security\JwtAuthenticator: ~
     App\Infrastructure\Security\JwtTokenDecoder:
         arguments:
             $publicKey: '%jwt.public_key%'
             $issuer: '%jwt.issuer%'
             $audience: '%jwt.audience%'
+    App\Infrastructure\DB\SchemaSqlHelper:
+        arguments:
+            $schema: '%db_schema%'
+    App\Infrastructure\Application\ApplicationInfo:
+        arguments:
+            $name: '%app.name%'
+            $version: '%app.version%'
+    App\Shared\Time\ClockInterface:
+        alias: App\Shared\Time\SystemClock
+    App\Shared\Time\SystemClock:
+        arguments:
+            $timezone: '%app.timezone%'

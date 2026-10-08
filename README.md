@@ -1,92 +1,38 @@
-# ONMI Backend — verification service
+# Место — catalog-service
 
-## Содержание
+Сервис профессиональных профилей, документов рынка труда и квалификационного тестирования. Актуальный этап: [кабинеты и выбор тестирования](../../docs/flows/cabinet-and-assessment-selection.md).
 
-- [Структура проекта](#struktura)
-- [Пояснения по слоям](#poyasneniya)
-- [Последовательность сборки](#posledovatelnost)
+## Реализовано
 
+Профиль соискателя/работодателя создаётся один раз при первом входе в кабинет через данные auth/user/me. Редактирование профиля, реальные счётчики документов, справочники специализаций/грейдов/компетенций/технологий и сохранение выбора тестирования. Авторизация — JWT RS256, UUID владельца и роль берутся из проверенного токена. Работодатель не проходит квалификационные задачи кандидата.
 
-## <a id="struktura"></a>Структура проекта
-```
-src/
- ├── Controller/
- │     └── Api/
- │           ├── Registration/                    # Контроллеры регистрации
- │           │     └── RegistrationController.php
- │           │
- │           └── Dictionaries/                    # Контроллеры справочников
- │                 └── DictionariesController.php
- │
- ├── Domain/
- │     └── Dictionary/                            # DDD Domain слой для справочников
- │           └── DictionaryProviderInterface.php  # интерфейс провайдера справочника
- │
- ├── Application/
- │     └── Dictionaries/                          # Слой Application (сервисы, DTO, исключения)
- │           ├── DictionaryService.php            # сервис работы со справочниками
- │           ├── DTO/
- │           │     └── RoleDto.php                # DTO для элемента справочника roles
- │           ├── DictionaryException.php          # базовое исключение справочников
- │           └── DictionaryNotFoundException.php  # кастомное исключение 404
- │
- ├── Infrastructure/
- │     └── Dictionaries/                          # Провайдеры справочников (работа с БД)
- │           ├── RolesDictionary.php
- │           ├── CountriesDictionary.php
- │           └── RolesCountriesDictionary.php
- │
- └── EventSubscriber/                              # Глобальные подписчики событий
-       └── ApiExceptionSubscriber.php              # перехватчик всех ошибок API
-```
+GET /workspace, PATCH /profile, GET /assessment/options, POST /assessment/preferences. Внешний префикс gateway: /catalog. Личные ответы не кешируются. Новые рабочие сервисы находятся в Application/Workspace и Infrastructure/Workspace. Старые товарные API и сервисы отключены в конфигурации; их исходники остаются до отдельной очистки.
 
-## <a id="poyasneniya"></a>Пояснения по слоям
+## Таблицы
 
-### Domain
-- Не содержит зависимостей от Symfony или БД.
+Миграция Version20261008140000 создаёт candidate_profiles, employer_profiles, resumes, vacancies, applications, offers, conversations, messages, bookmarks, saved_filters, tests, test_attempts. Справочники принадлежат dictionaries, аккаунты — auth; межсервисных SQL FK нет. tests/test_attempts соответствуют MVP прототипа от 6 октября с UUID внешнего аккаунта и локальной связью профиля/задачи/попытки.
 
-### Application
-- Сервисы (`DictionaryService`) управляют справочниками и используют провайдеры.
-- DTO (`RoleDto`) описывает структуры данных для API.
-- Исключения (`DictionaryNotFoundException`) задают бизнес-ошибки и коды для API.
+Пять неприменённых миграций прежнего товарного каталога перенесены в resources/legacy-migrations. Они не создают старые таблицы при новой установке. Схема до этой доработки была пустой. Для других окружений с прежней историей требуется отдельная оценка данных; эта доработка их не удаляет. down новой миграции запрещён для сохранности пользовательских документов.
 
-### Infrastructure
-- Конкретная реализация провайдеров (`RolesDictionary`), которые извлекают данные из БД.
-- Реализует интерфейсы Domain.
+## Следующий этап
 
-### Controller
-- Обрабатывает HTTP-запросы и формирует ответы в формате API.
-- Контроллеры регистрационных операций (`RegistrationController`) отделены от контроллеров справочников (`DictionariesController`).
+Создание/публикация резюме и вакансий, отклики, переписка, генерация задачи, сдача и предварительная оценка решения. Текущий кабинет сохраняет выбор тестирования, но не выдаёт фиктивные задачи и не назначает подтверждённый грейд.
 
-### EventSubscriber
-- Перехватывает все исключения и возвращает стандартизированный JSON с кодами ошибок и timestamp.
-- Работает для кастомных исключений (404, 500) и технических ошибок (PDO, DBAL).
+## Запуск и проверки
 
+Из ONMI_infra: make registration-up (или make web-up), миграции всех сервисов — make registration-migrate. Кабинет: http://localhost:8080/cabinet после входа с паролем.
 
-## <a id="posledovatelnost"></a>Последовательность сборки
-```bash
-# Клонируем основной репозиторий в директорию /services/auth-service/app
-git clone -b main https://git.tknovosib.ru/omni/mp-backend.git .
-```
-```bash
-# После клонирования репозитория собираем оркестрацию согласно командам из ONMI-infra
-make up  make migrate  make bootstrap   make rebuild-db
-```
-```bash
-# как только все контейнеры собраны запускаем миграцию базы данных внутри контейнера с проектом
-php bin/console doctrine:migrations:migrate   
-```
-```bash
-# Подключение к DB через любой консольный клиент поддерживающий Postgresql
-host: localhost
-port: $POSTGRES_USER
-username: $POSTGRES_USER   
-password: $POSTGRES_PASSWORD
-```
-```bash
-# роутинг идет по префиксам в URL - префикс данного проекта
-/api/auth/
-```
+В контейнере catalog_service_php: php tests/catalog-schema-contract.php. Тест создаёт/удаляет временную базу и проверяет миграции/ограничения. Сквозная проверка из корня проекта: python3 services/web-service/tests/registration-e2e.py (создаёт локальные тестовые аккаунты example.invalid). Генерация/оценка ИИ ещё не подключены.
+# Генерация и оценка заданий
 
+Кнопка получения задания использует API GigaChat; настройка `GIGACHAT_AUTH_KEY` передаётся из игнорируемого `ONMI_infra/.env`. Без ключа создание задания возвращает 503, без фиктивного результата. Модель задаётся `GIGACHAT_MODEL`, по умолчанию `GigaChat-2-Max`.
 
-php -r "echo password_hash('pass1234', PASSWORD_BCRYPT) . PHP_EOL;"
+Новая миграция `Version20261008180000` добавляет `assessment_jobs` — теперь 13 таблиц. `app:assessment:work` выполняется в фоне в контейнере catalog-service. Перед сетевым вызовом задача, критерии и пакет запроса сохраняются в PostgreSQL; запрос к ИИ не удерживает транзакцию. Генерация и оценка выполняются напрямую по HTTPS, регистрационная почта продолжает использовать Kafka.
+
+API: `POST /assessment/tests`, `GET /assessment/tests/{id}`, `POST /assessment/tests/{id}/answer`, `/submit`, `/retry-generation`, `/retry-evaluation`. Все маршруты требуют JWT соискателя и проверяют владельца. Создание принимает только UUID `requestKey`; ответ и отправка — только поле `text`.
+
+Одна попытка на задачу, черновик до отправки, фиксация после отправки. ИИ-наблюдения проверяются, баллы 0/1/2/null вычисляются сервером. Код соискателя не запускается, грейд не подтверждается.
+
+Локальные проверки без вызова ИИ: `make assessment-test` из ONMI_infra. Описание: `docs/flows/assessment-generation-and-evaluation.md` в корне проекта.
+
+Сертификаты Минцифры скачиваются только при сборке Docker target `catalog-gigachat`, в `/opt/gigachat` внутри образа. Только `GigaChatClient` использует `cafile`; системное хранилище контейнера и ОС хоста не меняются.

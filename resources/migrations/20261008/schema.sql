@@ -1,0 +1,90 @@
+CREATE TABLE candidate_profiles (
+user_uuid UUID PRIMARY KEY, display_name VARCHAR(100) NOT NULL, contact_email VARCHAR(255) NOT NULL,
+ headline VARCHAR(150) NOT NULL DEFAULT '', city VARCHAR(100) NOT NULL DEFAULT '', bio TEXT NOT NULL DEFAULT '',
+ country_code CHAR(2) NOT NULL DEFAULT 'RU', visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+ assessment_preferences JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(assessment_preferences)='object'), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE employer_profiles (
+user_uuid UUID PRIMARY KEY, contact_name VARCHAR(100) NOT NULL, contact_email VARCHAR(255) NOT NULL,
+ employer_type TEXT NOT NULL CHECK (employer_type IN ('company','entrepreneur','private')), public_name VARCHAR(150) NOT NULL,
+ description TEXT NOT NULL DEFAULT '', city VARCHAR(100) NOT NULL DEFAULT '', website VARCHAR(500) NOT NULL DEFAULT '', country_code CHAR(2) NOT NULL DEFAULT 'RU', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE resumes (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_uuid),
+ title VARCHAR(150) NOT NULL, content JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(content)='object'),
+ status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')), visibility TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+ version INTEGER NOT NULL DEFAULT 1 CHECK (version>0), published_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE (id,candidate_id)
+);
+
+CREATE TABLE vacancies (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), employer_id UUID NOT NULL REFERENCES employer_profiles(user_uuid),
+ title VARCHAR(150) NOT NULL, content JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(content)='object'), optional_assignment JSONB CHECK (optional_assignment IS NULL OR jsonb_typeof(optional_assignment)='object'),
+ status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','published','archived')), version INTEGER NOT NULL DEFAULT 1 CHECK (version>0), published_at TIMESTAMPTZ, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(id,employer_id)
+);
+
+CREATE TABLE applications (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_uuid), employer_id UUID NOT NULL REFERENCES employer_profiles(user_uuid),
+ vacancy_id UUID NOT NULL, resume_id UUID NOT NULL, resume_snapshot JSONB NOT NULL CHECK (jsonb_typeof(resume_snapshot)='object'), assignment_snapshot JSONB,
+ answer JSONB, assignment_score SMALLINT CHECK (assignment_score BETWEEN 0 AND 100), employer_score SMALLINT CHECK (employer_score BETWEEN 0 AND 100), employer_comment TEXT,
+ status TEXT NOT NULL DEFAULT 'submitted' CHECK (status IN ('submitted','reviewing','invited','rejected','withdrawn')), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE(candidate_id,vacancy_id), UNIQUE(id,candidate_id,employer_id), FOREIGN KEY(vacancy_id,employer_id) REFERENCES vacancies(id,employer_id), FOREIGN KEY(resume_id,candidate_id) REFERENCES resumes(id,candidate_id)
+);
+
+CREATE TABLE offers (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_uuid), employer_id UUID NOT NULL REFERENCES employer_profiles(user_uuid), vacancy_id UUID,
+ terms JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(terms)='object'), status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','sent','accepted','declined','withdrawn')), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE(id,candidate_id,employer_id), FOREIGN KEY(vacancy_id,employer_id) REFERENCES vacancies(id,employer_id)
+);
+
+CREATE TABLE conversations (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL, employer_id UUID NOT NULL, application_id UUID UNIQUE, offer_id UUID UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ CHECK (num_nonnulls(application_id,offer_id)=1), FOREIGN KEY(application_id,candidate_id,employer_id) REFERENCES applications(id,candidate_id,employer_id), FOREIGN KEY(offer_id,candidate_id,employer_id) REFERENCES offers(id,candidate_id,employer_id)
+);
+
+CREATE TABLE messages (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), conversation_id UUID NOT NULL REFERENCES conversations(id), author_id UUID NOT NULL,
+ body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 8000), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE bookmarks (
+id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_uuid UUID NOT NULL, target_type TEXT NOT NULL CHECK (target_type IN ('resume','vacancy')), target_id UUID NOT NULL,
+ created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_uuid,target_type,target_id)
+);
+
+CREATE TABLE saved_filters (
+user_uuid UUID NOT NULL, catalog_type TEXT NOT NULL CHECK (catalog_type IN ('resumes','vacancies')), filters JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(filters)='object'), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(user_uuid,catalog_type)
+);
+
+CREATE TABLE tests (
+id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, candidate_id UUID NOT NULL REFERENCES candidate_profiles(user_uuid), request_key TEXT NOT NULL CHECK (request_key<>''),
+ specialization_id BIGINT NOT NULL CHECK (specialization_id>0), declared_grade_id BIGINT NOT NULL CHECK (declared_grade_id>0),
+ competency_ids JSONB NOT NULL CHECK (jsonb_typeof(competency_ids)='array' AND jsonb_array_length(competency_ids) BETWEEN 1 AND 3),
+ technology_context JSONB NOT NULL CHECK (jsonb_typeof(technology_context)='array'), criteria_snapshot JSONB NOT NULL CHECK (jsonb_typeof(criteria_snapshot)='array' AND jsonb_array_length(criteria_snapshot)=jsonb_array_length(competency_ids)),
+ assignment JSONB CHECK (assignment IS NULL OR jsonb_typeof(assignment)='object'), status TEXT NOT NULL CHECK (status IN ('generating','ready','generation_failed')),
+ generation_metadata JSONB NOT NULL DEFAULT '{}' CHECK (jsonb_typeof(generation_metadata)='object'), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ UNIQUE(candidate_id,request_key), UNIQUE(id,candidate_id), CHECK (status<>'ready' OR assignment IS NOT NULL)
+);
+
+CREATE TABLE test_attempts (
+id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, candidate_id UUID NOT NULL, test_id BIGINT NOT NULL,
+ answer JSONB CHECK (answer IS NULL OR jsonb_typeof(answer)='object'), evaluation JSONB CHECK (evaluation IS NULL OR jsonb_typeof(evaluation)='object'),
+ status TEXT NOT NULL CHECK (status IN ('in_progress','evaluating','preliminary','awaiting_review','verified','evaluation_failed')),
+ started_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, submitted_at TIMESTAMPTZ,
+ FOREIGN KEY(test_id,candidate_id) REFERENCES tests(id,candidate_id) ON DELETE RESTRICT, UNIQUE(test_id), CHECK(submitted_at IS NULL OR submitted_at>=started_at)
+);
+
+CREATE INDEX resumes_by_owner ON resumes (candidate_id,updated_at);
+
+CREATE INDEX vacancies_by_owner ON vacancies (employer_id,updated_at);
+
+CREATE INDEX applications_by_owner ON applications (employer_id,created_at);
+
+CREATE INDEX offers_by_owner ON offers (candidate_id,created_at);
+
+CREATE INDEX messages_by_owner ON messages (conversation_id,created_at);
+
+CREATE INDEX tests_by_owner ON tests (candidate_id,created_at);
+
+CREATE INDEX test_attempts_by_owner ON test_attempts (candidate_id,started_at);

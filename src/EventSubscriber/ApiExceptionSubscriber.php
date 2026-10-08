@@ -8,7 +8,7 @@ use App\Shared\Exception\TooManyRequestsException;
 use App\Shared\Exception\UnauthorizedException;
 use App\Shared\Exception\UnprocessableEntityException;
 use App\Shared\Exception\IntegrationException;
-use App\Application\Dictionaries\DictionaryNotFoundException;
+use App\Shared\Exception\DictionaryNotFoundException;
 use App\Shared\Exception\UserNotFoundException;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
