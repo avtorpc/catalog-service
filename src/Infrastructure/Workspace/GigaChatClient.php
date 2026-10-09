@@ -13,7 +13,7 @@ final class GigaChatClient
     private int $expiresAt = 0;
 
     public function __construct(private HttpClientInterface $http,
-        #[Autowire('%env(GIGACHAT_AUTH_KEY)%')] private string $key,
+        #[Autowire('%env(AI_API_KEY)%')] private string $key,
         #[Autowire('%env(GIGACHAT_SCOPE)%')] private string $scope,
         #[Autowire('%env(GIGACHAT_MODEL)%')] private string $model,
         #[Autowire('%env(GIGACHAT_CA_FILE)%')] private string $caFile) {}
