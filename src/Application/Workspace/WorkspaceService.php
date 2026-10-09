@@ -41,16 +41,19 @@ final class WorkspaceService
   if(isset($row['assessment_preferences'])&&is_string($row['assessment_preferences']))$row['assessment_preferences']=json_decode($row['assessment_preferences'],true,512,JSON_THROW_ON_ERROR);
   return $row;
  }
- public function dashboard(array $identity,string $token,int $testsPage=1):array {
-  $profile=$this->initialize($identity,$token);$id=$identity['id'];
+ public function dashboard(array $identity,string $token,int $testsPage=1,int $vacanciesPage=1):array {
+  $profile=$this->initialize($identity,$token);$id=$identity['id'];$vacancies=[];$vacanciesPages=1;
   if($identity['role']==='applicant'){
    $counts=['resumes'=>$this->count('resumes','candidate_id',$id),'applications'=>$this->count('applications','candidate_id',$id),'tests'=>$this->count('tests','candidate_id',$id)];
    $testsPage=max(1,min($testsPage,max(1,(int)ceil($counts['tests']/20))));$offset=($testsPage-1)*20;
    $tests=$this->db->fetchAllAssociative("SELECT t.id,t.status,t.specialization_id,t.declared_grade_id,t.created_at,t.assignment->>'title' AS title,a.status AS attempt_status FROM ".$this->schema->table('tests').' t LEFT JOIN '.$this->schema->table('test_attempts').' a ON a.test_id=t.id WHERE t.candidate_id=? ORDER BY t.created_at DESC,t.id DESC LIMIT 20 OFFSET '.$offset,[$id]);
   }else{
    $counts=['vacancies'=>$this->count('vacancies','employer_id',$id),'applications'=>$this->count('applications','employer_id',$id),'offers'=>$this->count('offers','employer_id',$id)];$tests=[];
+   $vacanciesPages=max(1,(int)ceil($counts['vacancies']/20));$vacanciesPage=max(1,min($vacanciesPage,$vacanciesPages));$offset=($vacanciesPage-1)*20;
+   $vacancies=$this->db->fetchAllAssociative('SELECT * FROM '.$this->schema->table('vacancies').' WHERE employer_id=? ORDER BY updated_at DESC,id DESC LIMIT 20 OFFSET '.$offset,[$id]);
+   foreach($vacancies as &$vacancy)foreach(['content','optional_assignment'] as $field)if(is_string($vacancy[$field]))$vacancy[$field]=json_decode($vacancy[$field],true,512,JSON_THROW_ON_ERROR);unset($vacancy);
   }
-  return ['role'=>$identity['role'],'profile'=>$profile,'counts'=>$counts,'tests'=>$tests,'tests_page'=>max(1,$testsPage),'tests_pages'=>$identity['role']==='applicant'?max(1,(int)ceil($counts['tests']/20)):1];
+  return ['vacancies'=>$vacancies,'vacancies_page'=>$vacanciesPage,'vacancies_pages'=>$vacanciesPages,'role'=>$identity['role'],'profile'=>$profile,'counts'=>$counts,'tests'=>$tests,'tests_page'=>max(1,$testsPage),'tests_pages'=>$identity['role']==='applicant'?max(1,(int)ceil($counts['tests']/20)):1];
  }
  private function count(string $table,string $owner,string $id):int {return (int)$this->db->fetchOne('SELECT count(*) FROM '.$this->schema->table($table).' WHERE '.$owner.'=?',[$id]);}
  public function saveProfile(array $identity,array $input,string $token):array {

@@ -7,3 +7,13 @@ health:
 assessment:
     resource: ../src/Controller/AssessmentController.php
     type: attribute
+vacancies:
+    resource: ../src/Controller/VacancyController.php
+    type: attribute
+public_vacancies:
+    resource: ../src/Controller/PublicVacancyController.php
+    type: attribute
+
+applications:
+    resource: ../src/Controller/ApplicationController.php
+    type: attribute

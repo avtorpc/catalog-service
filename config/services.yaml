@@ -16,6 +16,9 @@ services:
     App\Infrastructure\Workspace\:
         resource: '../src/Infrastructure/Workspace/'
     App\Controller\WorkspaceController: ~
+    App\Controller\VacancyController: ~
+    App\Controller\ApplicationController: ~
+    App\Controller\PublicVacancyController: ~
     App\Controller\AssessmentController: ~
     App\Command\AssessmentWorkCommand: ~
     App\Controller\ApiController: ~

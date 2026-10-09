@@ -10,7 +10,7 @@ GET /workspace, PATCH /profile, GET /assessment/options, POST /assessment/prefer
 
 ## Таблицы
 
-Миграция Version20261008140000 создаёт candidate_profiles, employer_profiles, resumes, vacancies, applications, offers, conversations, messages, bookmarks, saved_filters, tests, test_attempts. Справочники принадлежат dictionaries, аккаунты — auth; межсервисных SQL FK нет. tests/test_attempts соответствуют MVP прототипа от 6 октября с UUID внешнего аккаунта и локальной связью профиля/задачи/попытки.
+Миграция Version20261008140000 создаёт candidate_profiles, employer_profiles, resumes, vacancies, applications, offers, bookmarks, saved_filters, tests, test_attempts. Справочники принадлежат dictionaries, аккаунты — auth; межсервисных SQL FK нет. tests/test_attempts соответствуют MVP прототипа от 6 октября с UUID внешнего аккаунта и локальной связью профиля/задачи/попытки.
 
 Пять неприменённых миграций прежнего товарного каталога перенесены в resources/legacy-migrations. Они не создают старые таблицы при новой установке. Схема до этой доработки была пустой. Для других окружений с прежней историей требуется отдельная оценка данных; эта доработка их не удаляет. down новой миграции запрещён для сохранности пользовательских документов.
 
@@ -27,7 +27,7 @@ GET /workspace, PATCH /profile, GET /assessment/options, POST /assessment/prefer
 
 Кнопка получения задания использует API GigaChat; настройка `GIGACHAT_AUTH_KEY` передаётся из игнорируемого `ONMI_infra/.env`. Без ключа создание задания возвращает 503, без фиктивного результата. Модель задаётся `GIGACHAT_MODEL`, по умолчанию `GigaChat-2-Max`.
 
-Новая миграция `Version20261008180000` добавляет `assessment_jobs` — теперь 13 таблиц. `app:assessment:work` выполняется в фоне в контейнере catalog-service. Перед сетевым вызовом задача, критерии и пакет запроса сохраняются в PostgreSQL; запрос к ИИ не удерживает транзакцию. Генерация и оценка выполняются напрямую по HTTPS, регистрационная почта продолжает использовать Kafka.
+Новая миграция `Version20261008180000` добавляет `assessment_jobs` — после переноса переписки в catalog осталось 11 таблиц. `app:assessment:work` выполняется в фоне в контейнере catalog-service. Перед сетевым вызовом задача, критерии и пакет запроса сохраняются в PostgreSQL; запрос к ИИ не удерживает транзакцию. Генерация и оценка выполняются напрямую по HTTPS, регистрационная почта продолжает использовать Kafka.
 
 API: `POST /assessment/tests`, `GET /assessment/tests/{id}`, `POST /assessment/tests/{id}/answer`, `/submit`, `/retry-generation`, `/retry-evaluation`. Все маршруты требуют JWT соискателя и проверяют владельца. Создание принимает только UUID `requestKey`; ответ и отправка — только поле `text`.
 
@@ -36,3 +36,39 @@ API: `POST /assessment/tests`, `GET /assessment/tests/{id}`, `POST /assessment/t
 Локальные проверки без вызова ИИ: `make assessment-test` из ONMI_infra. Описание: `docs/flows/assessment-generation-and-evaluation.md` в корне проекта.
 
 Сертификаты Минцифры скачиваются только при сборке Docker target `catalog-gigachat`, в `/opt/gigachat` внутри образа. Только `GigaChatClient` использует `cafile`; системное хранилище контейнера и ОС хоста не меняются.
+
+## Черновики вакансий работодателя
+
+`GET /workspace?vacanciesPage=1` возвращает собственные вакансии работодателя
+(по 20 на страницу), счётчики и данные связанного задания из `optional_assignment`.
+`GET /vacancies/{uuid}` читает собственную вакансию; `POST /vacancies` сохраняет
+черновик с полями `id`, `version`, `title`, `content`. Для новой записи клиент
+создаёт UUID и передаёт `version: 0`; повтор идентичного запроса не создаёт дубль.
+Редактирование требует актуальной версии; конфликт возвращает 409. Роль
+соискателя получает 403, чужие записи — 404. Генерация задания
+работодателя пока не подключена.
+
+Используются существующие `catalog.vacancies` и `catalog.employer_profiles`;
+новые таблицы и миграции для этого этапа не нужны. Поля условий и описания
+хранятся в `content`; связанное задание — в `optional_assignment`.
+
+Проверка без внешних вызовов: `php tests/vacancy-contract.php`. Она создаёт
+отдельную временную PostgreSQL-базу и удаляет её после проверки.
+
+`POST /vacancies/{uuid}/publish` и `/unpublish` принимают актуальную `version`,
+проверяют роль и владельца. Публикация требует обязательных полей по прототипу;
+снятие возвращает вакансию в черновик для редактирования. Каждое изменение
+статуса увеличивает версию; устаревшая форма получает 409.
+
+`GET /public/vacancies` и `/public/vacancies/{uuid}` доступны без JWT и возвращают
+только опубликованные записи с датой публикации. Черновики и архив недоступны;
+неизвестная или снятая вакансия возвращает 404. Публичная проекция исключает
+UUID работодателя, его email, контактные данные и внутренние поля записи.
+
+## Отклики и переписка
+
+`applications` и `offers` принадлежат каталогу. Переписка перенесена в схему `node` миграцией Version20261009160000 без удаления сообщений. Новая установка каталога не создаёт `conversations` и `messages`.
+
+`POST /applications` принимает vacancyId, resumeTitle, resumeText, coverLetter. Первый отклик сохраняет закрытое резюме и его снимок; повторный запрос возвращает существующий отклик и не заменяет снимок. `GET /applications` и `GET /applications/{id}/chat-context` доступны только участникам. `PATCH /applications/{id}` меняет статус и оценку работодателя. `POST /applications/{id}/review` переводит только submitted в reviewing после сообщения работодателя, сохраняя приглашение/отказ.
+
+Быстрый отклик с главной: POST /applications/start-chat через web /cabinet/chat-api/apply-chat. Первый клик сохраняет снимок профиля (kind=profile, resume_id=NULL) и создаёт общий диалог; повторный возвращает тот же отклик и чат, не заменяя ранее отправленное резюме. Готовое резюме для начала переписки не требуется.

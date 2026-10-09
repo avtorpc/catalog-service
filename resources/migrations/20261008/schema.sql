@@ -38,16 +38,6 @@ id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL REFERE
  UNIQUE(id,candidate_id,employer_id), FOREIGN KEY(vacancy_id,employer_id) REFERENCES vacancies(id,employer_id)
 );
 
-CREATE TABLE conversations (
-id UUID PRIMARY KEY DEFAULT gen_random_uuid(), candidate_id UUID NOT NULL, employer_id UUID NOT NULL, application_id UUID UNIQUE, offer_id UUID UNIQUE, created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
- CHECK (num_nonnulls(application_id,offer_id)=1), FOREIGN KEY(application_id,candidate_id,employer_id) REFERENCES applications(id,candidate_id,employer_id), FOREIGN KEY(offer_id,candidate_id,employer_id) REFERENCES offers(id,candidate_id,employer_id)
-);
-
-CREATE TABLE messages (
-id UUID PRIMARY KEY DEFAULT gen_random_uuid(), conversation_id UUID NOT NULL REFERENCES conversations(id), author_id UUID NOT NULL,
- body TEXT NOT NULL CHECK (char_length(body) BETWEEN 1 AND 8000), created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE bookmarks (
 id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_uuid UUID NOT NULL, target_type TEXT NOT NULL CHECK (target_type IN ('resume','vacancy')), target_id UUID NOT NULL,
  created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, UNIQUE(user_uuid,target_type,target_id)
@@ -82,8 +72,6 @@ CREATE INDEX vacancies_by_owner ON vacancies (employer_id,updated_at);
 CREATE INDEX applications_by_owner ON applications (employer_id,created_at);
 
 CREATE INDEX offers_by_owner ON offers (candidate_id,created_at);
-
-CREATE INDEX messages_by_owner ON messages (conversation_id,created_at);
 
 CREATE INDEX tests_by_owner ON tests (candidate_id,created_at);
 

@@ -20,7 +20,7 @@ try{
  $_SERVER['DB_SCHEMA']=$_ENV['DB_SCHEMA']='catalog';putenv('DB_SCHEMA=catalog');
  $kernel=new App\Kernel('prod',false);$app=new Application($kernel);$app->setAutoExit(false);$app->setCatchExceptions(false);
  foreach([1,2] as $run){$input=new ArrayInput(['command'=>'doctrine:migrations:migrate','--no-interaction'=>true]);$input->setInteractive(false);$out=new BufferedOutput();check($app->run($input,$out)===0,'Migration failed');}
- $expected=['applications','assessment_jobs','bookmarks','candidate_profiles','conversations','employer_profiles','messages','offers','resumes','saved_filters','test_attempts','tests','vacancies'];
+ $expected=['applications','assessment_jobs','bookmarks','candidate_profiles','employer_profiles','offers','resumes','saved_filters','test_attempts','tests','vacancies'];
  check($db->fetchFirstColumn("SELECT tablename FROM pg_tables WHERE schemaname='catalog' AND tablename NOT LIKE 'doctrine_migration_versions%' ORDER BY tablename")===$expected,'Wrong table set');
  $a='00000000-0000-4000-8000-000000000001';$b='00000000-0000-4000-8000-000000000002';$e='00000000-0000-4000-8000-000000000003';$f='00000000-0000-4000-8000-000000000004';
  foreach([$a,$b] as $id)$db->insert('catalog.candidate_profiles',['user_uuid'=>$id,'display_name'=>'Candidate','contact_email'=>$id.'@example.invalid']);
@@ -32,9 +32,6 @@ try{
  reject($db,'INSERT INTO catalog.applications(candidate_id,employer_id,vacancy_id,resume_id,resume_snapshot) VALUES (?,?,?,?,?)',[$a,$e,$vacancy,$resume,'{}']);
  reject($db,'INSERT INTO catalog.offers(candidate_id,employer_id,vacancy_id) VALUES (?,?,?)',[$a,$f,$vacancy]);
  $offer=$db->fetchOne('INSERT INTO catalog.offers(candidate_id,employer_id) VALUES (?,?) RETURNING id',[$a,$e]);
- $conversation=$db->fetchOne('INSERT INTO catalog.conversations(candidate_id,employer_id,offer_id) VALUES (?,?,?) RETURNING id',[$a,$e,$offer]);
- reject($db,'INSERT INTO catalog.conversations(candidate_id,employer_id,application_id) VALUES (?,?,?)',[$b,$e,$application]);
- reject($db,'INSERT INTO catalog.conversations(candidate_id,employer_id,application_id,offer_id) VALUES (?,?,?,?)',[$a,$e,$application,$offer]);
  reject($db,'UPDATE catalog.applications SET employer_score=101 WHERE id=?',[$application]);
  $test=$db->fetchOne("INSERT INTO catalog.tests(candidate_id,request_key,specialization_id,declared_grade_id,competency_ids,technology_context,criteria_snapshot,status,assignment) VALUES (?,'key',1,1,'[1]','[]','[{}]','ready','{}') RETURNING id",[$a]);
  reject($db,"INSERT INTO catalog.test_attempts(candidate_id,test_id,status) VALUES (?,?,'in_progress')",[$b,$test]);
@@ -43,5 +40,5 @@ try{
  reject($db,'UPDATE catalog.tests SET assignment=NULL WHERE id=?',[$test]);
  reject($db,'UPDATE catalog.tests SET criteria_snapshot=CAST(? AS JSONB) WHERE id=?',['[]',$test]);
  reject($db,"INSERT INTO catalog.saved_filters(user_uuid,catalog_type) VALUES (?,'wrong')",[$a]);
- echo "PASS: 13 tables, full Doctrine install/repeat, document ownership, unique applications, offer/chat context, assessment ownership, one attempt, snapshots and score constraints\n";
+ echo "PASS: 11 tables, full Doctrine install/repeat, document ownership, unique applications, offer context, assessment ownership, one attempt, snapshots and score constraints\n";
 }finally{if($kernel!==null)$kernel->shutdown();if($db!==null)$db->close();$admin->executeStatement('DROP DATABASE IF EXISTS '.$name.' WITH (FORCE)');$admin->close();}

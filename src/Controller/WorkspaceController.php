@@ -17,7 +17,7 @@ final class WorkspaceController
   $identity=$this->workspace->identity($this->auth->authenticate($request));$token=substr((string)$request->headers->get('Authorization'),7);
   $path=$request->getPathInfo();
   $data=match($path){
-   '/workspace'=>$this->workspace->dashboard($identity,$token,$request->query->getInt('testsPage',1)),
+   '/workspace'=>$this->workspace->dashboard($identity,$token,$request->query->getInt('testsPage',1),$request->query->getInt('vacanciesPage',1)),
    '/profile'=>$this->workspace->saveProfile($identity,$request->toArray(),$token),
    '/assessment/preferences'=>$this->workspace->savePreferences($identity,$request->toArray(),$token),
    '/assessment/options'=>$this->workspace->options($identity,$request->query->has('specializationId')?$request->query->getInt('specializationId'):null),
