@@ -72,3 +72,9 @@ UUID работодателя, его email, контактные данные �
 `POST /applications` принимает vacancyId, resumeTitle, resumeText, coverLetter. Первый отклик сохраняет закрытое резюме и его снимок; повторный запрос возвращает существующий отклик и не заменяет снимок. `GET /applications` и `GET /applications/{id}/chat-context` доступны только участникам. `PATCH /applications/{id}` меняет статус и оценку работодателя. `POST /applications/{id}/review` переводит только submitted в reviewing после сообщения работодателя, сохраняя приглашение/отказ.
 
 Быстрый отклик с главной: POST /applications/start-chat через web /cabinet/chat-api/apply-chat. Первый клик сохраняет снимок профиля (kind=profile, resume_id=NULL) и создаёт общий диалог; повторный возвращает тот же отклик и чат, не заменяя ранее отправленное резюме. Готовое резюме для начала переписки не требуется.
+
+## Зависимости без сетевой установки
+
+Полная папка vendor хранится в Git, включая автозагрузчик и лицензии. При запуске контейнера `php bin/check-vendor.php` локально проверяет пакеты по composer.lock и автозагрузку Symfony/Doctrine. Composer и Packagist при запуске не вызываются; неполный или несогласованный vendor останавливает запуск с сообщением об ошибке.
+
+Обновляйте зависимости на машине с доступом к репозиториям через `composer install --no-interaction --prefer-dist --no-scripts`, затем проверяйте `php bin/check-vendor.php`. Сохраняйте весь vendor вместе с composer.json и composer.lock. Для целевого изменения версий используйте composer update. Файлы .env, var и секреты остаются исключены из Git.

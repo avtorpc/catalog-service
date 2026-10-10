@@ -6,7 +6,6 @@
 #/config/secrets/prod/prod.decrypt.private.php
 /public/bundles/
 /var/
-#/vendor/
 ###< symfony/framework-bundle ###
 
 
@@ -45,12 +44,14 @@ var/cache/
 /.env.local
 /.env.local.php
 /.env.*.local
-vendor/
 var/
 node_modules/
-/vendor/
 /var/
 /public/bundles/
 /config/secrets/*/*.decrypt.private.php
 /.phpunit.cache/
 /.phpunit.result.cache
+
+# Ship complete locked PHP dependencies for offline deployment.
+!/vendor/
+!/vendor/**
